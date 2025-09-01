@@ -21,7 +21,7 @@ class allparameters(nn.Module):
         self.Gamma25 = torch.tensor(42.75)
         self.alphaG_r = torch.tensor(-10.0)
         self.alphaG = torch.sigmoid(self.alphaG_r)
-        self.gm = torch.tensor(100.0)
+        self.gm = torch.tensor(2.0)
         self.Rdratio_r = torch.tensor(-10)
         self.Rdratio = torch.tensor(0.01)
 
@@ -414,7 +414,7 @@ class FvCB(nn.Module):
 
 
         if self.fitgm:
-            gm = torch.clamp(self.gm, min=0.0001)
+            gm = self.gm
             if self.lcd.num_FGs > 1:
                 gm = torch.repeat_interleave(gm[self.lcd.FGs_idx], self.lcd.lengths, dim=0)
             self.Cc = self.lcd.Ci - self.lcd.A / gm
@@ -508,6 +508,7 @@ class Loss(nn.Module):
         self.Ci = lcd.Ci
         self.mask_Ci500 = (lcd.Ci > 500) & (lcd.Ci < 700)
         self.num_IDs = lcd.num
+        self.maxACi = lcd.maxACi
 
     def forward(self, fvc_model, An_o, Ac_o, Aj_o, Ap_o,iter):
 
@@ -549,6 +550,12 @@ class Loss(nn.Module):
             else:
                 loss += self.relu(fvc_model.Vcmax25-130)[0] * 0.2
 
+        if fvc_model.fitgm:
+            gm = fvc_model.gm[fvc_model.lcd.FGs_idx]*0.9
+            if self.num_FGs > 1:
+                loss += torch.sum(self.relu(self.maxACi-gm)) * 10
+            elif self.num_FGs == 1:
+                loss += self.relu(torch.max(self.maxACi)-gm)[0] * 10
 
         if fvc_model.TempResponse.type == 2:
             if self.num_FGs > 1:

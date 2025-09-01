@@ -3,6 +3,7 @@
 import torch
 import photorch.src.fvcb.fvcbmodels as initM
 import time
+from torch.cuda.amp import autocast, GradScaler
 
 # get rmse loss
 def get_rmse_loss(An_o, An_r):
@@ -24,6 +25,12 @@ def run(fvcbm:initM.FvCB, learn_rate = 0.6, maxiteration = 20000, minloss = 3, r
         loss_all = torch.tensor([]).to(device)
     else:
         loss_all = torch.tensor([])
+
+    if isinstance(device, torch.device) and device.type == 'cuda':
+        scaler = GradScaler()
+        use_amp = True
+    else:
+        use_amp = False
 
     criterion = initM.Loss(fvcbm.lcd, ApCithreshold, fitcorr, weakconstiter)
     optimizer = torch.optim.Adam(fvcbm.parameters(), lr=learn_rate)
@@ -48,19 +55,33 @@ def run(fvcbm:initM.FvCB, learn_rate = 0.6, maxiteration = 20000, minloss = 3, r
                 self.allweights['alphaG'] = model.alphaG.data.cpu().unsqueeze(0)
 
     recordweights = recordweights()
-
+    
     for iter in range(maxiteration):
 
         optimizer.zero_grad()
 
-        An_o, Ac_o, Aj_o, Ap_o = fvcbm()
-        loss = criterion(fvcbm, An_o, Ac_o, Aj_o, Ap_o,iter)
+        if use_amp:
+            with autocast():
+                An_o, Ac_o, Aj_o, Ap_o = fvcbm()
+                loss = criterion(fvcbm, An_o, Ac_o, Aj_o, Ap_o,iter)
+        else:
+            An_o, Ac_o, Aj_o, Ap_o = fvcbm()
+            loss = criterion(fvcbm, An_o, Ac_o, Aj_o, Ap_o,iter)
 
-        loss.backward()
+        if use_amp:
+            scaler.scale(loss).backward()
+        else:
+            loss.backward()
+
         if (iter + 1) % 200 == 0 and printout:
             print(f'Loss at iter {iter}: {loss.item():.4f}')
 
-        optimizer.step()
+        if use_amp:
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            optimizer.step()
+
         scheduler.step()
         if recordweightsTF:
             recordweights.getweights(fvcbm)

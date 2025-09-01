@@ -134,6 +134,8 @@ class initLicordata():
         # create a boolean mask for TPU fitting, initialize all to True with length equal to the number of samples
         self.mask_fitTPU = torch.tensor([])
 
+        self.maxACi = torch.tensor([]) # store the maximum A/Ci for each curve, which can be used to constrain the fitting of gm
+
         for i in range(len(IDs)):
             id = IDs[i]
             indices = np.where(LCdata[idname] == id)[0]
@@ -167,7 +169,8 @@ class initLicordata():
                 lightcurve = False
             if preprocess:
                 A, Ci, indices = preprocessCurve(A, Ci, indices, smoothingwindow, up_treshold, down_treshold, lightcurve)
-
+            ACimax = np.max(A/Ci)
+            self.maxACi = torch.cat((self.maxACi, torch.tensor([ACimax])))
             self.A = torch.cat((self.A, torch.tensor(A)))
             try:
                 self.Q = torch.cat((self.Q, torch.tensor(LCdata['Qin'].iloc[indices].to_numpy())))
@@ -229,6 +232,7 @@ class initLicordata():
         self.lengths = self.lengths.to(device)
         self.mask_lightresp = self.mask_lightresp.to(device)
         self.mask_nolightresp = self.mask_nolightresp.to(device)
+        self.maxACi = self.maxACi.to(device)
 
     def getDatabyID(self, ID):
         # get the index of ID

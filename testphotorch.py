@@ -7,9 +7,10 @@ util.selftest() # Check if all models are working
 # FvCB model fitting
 dftest = pd.read_csv('photorch/data/tests/dfMAGIC043_lr.csv')
 lcd = fvcb.initLicordata(dftest, preprocess=True, lightresp_id = [118])
-fvcbm = fvcb.model(lcd, LightResp_type = 2, TempResp_type = 0, onefit = False)
-fitresult = fvcb.fit(fvcbm, learn_rate= 0.06, maxiteration = 20000, minloss= 1, fitcorr=False) # If temp type is 0, do not set fitcorr to True
+fvcbm = fvcb.model(lcd, LightResp_type = 2, TempResp_type = 0, onefit = False,fitgm =True)
+fitresult = fvcb.fit(fvcbm, learn_rate= 0.06, maxiteration = 20000, minloss= 1, fitcorr=False ) # If temp type is 0, do not set fitcorr to True
 fvcbm = fitresult.model
+print(fvcbm.gm)
 fvcbm.eval()
 A_fit, Ac_fit, Aj_fit, Ap_fit = fvcbm()
 
